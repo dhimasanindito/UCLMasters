@@ -2341,12 +2341,6 @@ Kelurahan$Reports_Density_Area_Sc <- scale(KelurahanSF$ReportsDensityArea, cente
 Kelurahan$Reports_Density_Pop_Sc <- scale(KelurahanSF$ReportsDensityPop, center = TRUE, scale = TRUE)
 Kelurahan$Reports_Density_User_Sc <- scale(KelurahanSF$ReportsDensityUsers, center = TRUE, scale = TRUE)
 
-a <- Kelurahan[,cbind(48:62)]
-KelurahanPython <- as(Kelurahan, "SpatialPolygonsDataFrame")
-
-writeOGR(KelurahanPython, "KelurahanPython", layer='newstuff', driver="ESRI Shapefile")
-writeOGR(KelurahanPython, "Kelurahan_geojson", layer="Kelurahan", driver="GeoJSON")
-
 # •••••••••••••••••••••••••••••••••
 # Ordinary Least Squares Regression
 # •••••••••••••••••••••••••••••••••

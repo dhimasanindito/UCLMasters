@@ -6,8 +6,8 @@
 # MSc Smart Cities and Urban Analytics, University College London
 
 # The algorithms are divided into several sections: data cleaning and preparation, Spatial Autocorrelation,
-# Temporal data visualisation, DBSCAN, Structural Equation Modelling, Geographically Weighted Regression (GWR), 
-# and Multiscale GWR (MGWR)
+# Temporal data visualisation, K-means clustering, DBSCAN, Structural Equation Modelling,  
+# Geographically Weighted Regression (GWR), and Multiscale GWR (MGWR)
 
 ############################
 ##### Library Settings #####

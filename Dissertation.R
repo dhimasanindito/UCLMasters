@@ -6,8 +6,8 @@
 # MSc Smart Cities and Urban Analytics, University College London
 
 # The algorithms are divided into several sections: data cleaning and preparation, Spatial Autocorrelation,
-# Temporal data visualisation, K-means clustering, DBSCAN, Structural Equation Modelling,  
-# Geographically Weighted Regression (GWR), and Multiscale GWR (MGWR)
+# Temporal data visualisation, DBSCAN, Structural Equation Modelling, Geographically Weighted Regression (GWR), 
+# and Multiscale GWR (MGWR)
 
 ############################
 ##### Library Settings #####
@@ -42,6 +42,21 @@ library(broom)
 library(dplyr)
 library(spatstat)
 library(raster)
+library(deldir)
+library(patchwork)
+
+
+library(data.table)  # faster fread() and better weekdays()
+library(dplyr)       # consistent data.frame operations
+library(purrr)       # consistent & safe list/vector munging
+library(tidyr)       # consistent data.frame cleaning
+library(lubridate)   # date manipulation
+library(ggplot2)     # base plots are for Coursera professors
+library(scales)      # pairs nicely with ggplot2 for plot label formatting
+library(gridExtra)   # a helper for arranging individual ggplot objects
+library(ggthemes)    # has a clean theme for ggplot2
+library(viridis)     # best. color. palette. evar.
+library(knitr)       # kable : prettier data.frame output
 
 setwd("/Users/dhimasbayuanindito/Google Drive/Dissertation")
 getwd()
@@ -59,7 +74,7 @@ getwd()
 #-------------------------------
 
 # Reading the shapefile of kelurahan into a simple features object
-KecamatanSF <- st_read(kec_shp_directory)
+KecamatanSF <- st_read("Jakarta Shapefile/dki_kecamatan/dki_kecamatan.shp")
 summary(KecamatanSF)
 
 # Plotting it to check it has been read in correctly
@@ -150,6 +165,7 @@ ReportsSub@data$Day <- weekdays(as.Date(ReportsSub@data$Date))
 
 # Making a dataframe based on the day when the report is submitted
 ReportDay <- data.frame(ReportsSub@data$Day)
+ReportDay
 
 # Assigning date of each report as weekend (in Boolean)
 ReportsSub@data$Weekend <- chron::is.weekend(ReportsSub@data$Date)
@@ -164,6 +180,12 @@ ReportsSub@data$TimeCategory <- c("Midnight","Morning","Afternoon","Evening")[as
 # Assigning reports to hourly frame
 hourcategory <- cut(chron::times(time) , breaks = (1/24) * c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24))
 ReportsSub@data$HourCategory <- c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24)[as.numeric(hourcategory)]
+
+# Sorting the day from Monday to Sunday
+ReportsSub$Day <- factor(ReportsSub$Day,levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+
+# Assigning the number of week into dataframe
+ReportsSub$Week <- week(ymd(ReportsSub$Date))
 
 # -------------------------------------
 # Subsetting report based on categories
@@ -221,6 +243,7 @@ KelurahanSF$Smoking <- poly.counts(Smoking,Kelurahan)
 
 # Assigning point count of smoking report to each kecamatan
 KecamatanSF$Smoking <- poly.counts(Smoking,Kecamatan)
+
 
 # Reports related to public facilities
 PF <- ReportsSub[ReportsSub@data$Category == "Fasilitas Anak" | 
@@ -340,6 +363,9 @@ tm_shape(Kelurahan) +
               palette="Blues",
               midpoint=NA,
               title="Reports Density - Users")
+
+
+
 
 #----------------------------------
 #---- Spatial Autocorrelation -----
@@ -1244,7 +1270,7 @@ FigTotMths <- ggplot(data=ReportTotal, aes(x=Date)) +
   scale_fill_manual(values = c("#00AFBB", "#FC4E07") ) + 
   theme(legend.position="none" ) +
   ggtitle("Daily frequency of Qlue Reports") 
-FigTotMths
+FigTotDay
 
 # Plotting a histogram based on the total daily frequency of reports
 FigTotDay <- ggplot(data=ReportTotal, aes(x=Day)) + 
@@ -1264,6 +1290,45 @@ FigTotal <- ggplot(data=ReportTotal, aes(x=HourCategory)) +
   ggtitle("Hourly frequency of Qlue Reports") 
 FigTotal
 
+# HEATMAP
+
+a <- count(ReportTotal, Day, HourCategory)
+b <- count(FloodTotal, Week, Day)
+c <- count(TransportTotal, Week, Day)
+d <- count(TrafficTotal, Week, Day)
+e <- count(PFTotal, Week, Day)
+
+# Total reports per weekday & time of day
+HMTotalReports <- ggplot(a, aes(x=HourCategory, y=Day, fill=n)) + geom_tile(color="white", size=0.1) + 
+  scale_fill_viridis(name="# Events", label=comma) + coord_equal() + 
+  labs(x=NULL, y=NULL, title="Total reports per week") + theme_tufte(base_family="Helvetica") + 
+  theme(plot.title=element_text(hjust=0)) + theme(axis.ticks=element_blank()) + theme(axis.text=element_text(size=7)) +
+  theme(legend.title=element_text(size=8)) + theme(legend.text=element_text(size=6))
+HMTotalReports
+
+# Flood
+HMFlood <- ggplot(b, aes(x=Week, y=Day, fill=n)) + geom_tile(color="white", size=0.1) + 
+  scale_fill_viridis(name="# Events", label=comma) + coord_equal() + 
+  labs(x=NULL, y=NULL, title="Flood reports") + theme_tufte(base_family="Helvetica") + 
+  theme(plot.title=element_text(hjust=0)) + theme(axis.ticks=element_blank()) + theme(axis.text=element_text(size=7)) +
+  theme(legend.title=element_text(size=8)) + theme(legend.text=element_text(size=6))
+HMFlood
+
+HMTraffic <- ggplot(d, aes(x=Week, y=Day, fill=n)) + geom_tile(color="white", size=0.1) + 
+  scale_fill_viridis(name="# Events", label=comma) + coord_equal() + 
+  labs(x=NULL, y=NULL, title="Traffic reports") + theme_tufte(base_family="Helvetica") + 
+  theme(plot.title=element_text(hjust=0)) + theme(axis.ticks=element_blank()) + theme(axis.text=element_text(size=7)) +
+  theme(legend.title=element_text(size=8)) + theme(legend.text=element_text(size=6))
+HMTraffic
+
+HMPF <- ggplot(e, aes(x=Week, y=Day, fill=n)) + geom_tile(color="white", size=0.1) + 
+  scale_fill_viridis(name="# Events", label=comma) + coord_equal() + 
+  labs(x='Week', y=NULL, title="Public Facilities reports") + theme_tufte(base_family="Helvetica") + 
+  theme(plot.title=element_text(hjust=0)) + theme(axis.ticks=element_blank()) + theme(axis.text=element_text(size=7)) +
+  theme(legend.title=element_text(size=8)) + theme(legend.text=element_text(size=6))
+HMPF
+
+HMFlood / HMTraffic / HMPF
 
 # Total reports per date
 TotDate <- data.frame(count(ReportTotal, Date))
@@ -1344,10 +1409,11 @@ KecamatanSF$Midnight <- poly.counts(ReportMidnight,Kecamatan)
 # ----------------------------
 FloodTotal <- data.frame(Flood)
 TrafficTotal <- data.frame(Traffic)
-Transport <- data.frame(Transport)
-Smoking <- data.frame(Smoking)
+TransportTotal <- data.frame(Transport)
+SmokingTotal <- data.frame(Smoking)
 PFTotal <- data.frame(PF)
 CrimeTotal <- data.frame(Crime)
+
 
 # Total
 FigFloodMths <- ggplot(data=FloodTotal, aes(x=Date)) + 
@@ -1365,6 +1431,7 @@ FigTrafficMths <- ggplot(data=TrafficTotal, aes(x=Date)) +
   theme(legend.position="none", axis.text=element_text(size=14), axis.title=element_text(size=16,face="bold")) +
   ggtitle("Daily frequency of Traffic reports") 
 FigTrafficMths
+
 
 FigTransportMths <- ggplot(data=TransportTotal, aes(x=Date)) + 
   labs(x = "Day", y = "Count") + 
@@ -1744,9 +1811,6 @@ Kecamatan$PFDensityUser <- KecamatanSF$PF/KecamatanSF$Total_User
 PF1 <- data.frame(PF)
 PF1
 
-# Arranging the order of the day
-PF1$Day <- factor(PF1$Day,levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
-
 # Plotting a histogram based on the daily frequency of reports
 FigDay1 <- ggplot(data=PF1, aes(x=Day)) + 
   labs(x = "Day", y = "Count") + 
@@ -1755,6 +1819,8 @@ FigDay1 <- ggplot(data=PF1, aes(x=Day)) +
   theme(legend.position="none" ) +
   ggtitle("Daily frequency of PF Reports") 
 FigDay1
+
+
 
 # Plotting a histogram based on the hourly frequency of reports
 FigTotalPF <- ggplot(data=PF1, aes(x=HourCategory)) + 
@@ -2341,6 +2407,12 @@ Kelurahan$Reports_Density_Area_Sc <- scale(KelurahanSF$ReportsDensityArea, cente
 Kelurahan$Reports_Density_Pop_Sc <- scale(KelurahanSF$ReportsDensityPop, center = TRUE, scale = TRUE)
 Kelurahan$Reports_Density_User_Sc <- scale(KelurahanSF$ReportsDensityUsers, center = TRUE, scale = TRUE)
 
+a <- Kelurahan[,cbind(48:62)]
+KelurahanPython <- as(Kelurahan, "SpatialPolygonsDataFrame")
+
+writeOGR(KelurahanPython, "KelurahanPython", layer='newstuff', driver="ESRI Shapefile")
+writeOGR(KelurahanPython, "Kelurahan_geojson", layer="Kelurahan", driver="GeoJSON")
+
 # •••••••••••••••••••••••••••••••••
 # Ordinary Least Squares Regression
 # •••••••••••••••••••••••••••••••••
@@ -2354,6 +2426,13 @@ KelurahanSF$coord.y <- coordsKel[,2]
 # Kelurahan variables
 vif(lm(Reports_Count_Sc ~ Female_User_Sc + Male_User_Sc + PctUnemployed_Sc + Shannon_Type_Sc + Shannon_Time_Sc + Shannon_Age_Sc, data=Kelurahan))
 summary(Kelurahan)
+
+# COBA
+vif(lm(ReportsCount ~ Female_Use + Male_User + PctUnemplo + Shannon_Type + Shannon_Time + Shannon_Age, data=KelurahanSF))
+summary(Kelurahan)
+kel_regression1 <- lm(ReportsCount ~ Female_Use + Male_User + PctUnemplo + Shannon_Type + Shannon_Time + Shannon_Age, data=KelurahanSF)
+summary(kel_regression1)
+
 
 # --------------
 # OLS Regression
@@ -2382,11 +2461,12 @@ spplot(map.resids_kel, cuts=quantile(resids_kel), col.regions=colours, cex=2)
 # Geographically Weighted Regression
 # ----------------------------------
 # Calculating kernel bandwidth
-GWRbandwidth_kel <- gwr.sel(Reports_Count_Sc ~ Female_User_Sc + Male_User_Sc + Shannon_Time_Sc + Shannon_Age_Sc, data=Kelurahan, adapt=T, method = 'aic') 
+GWRbandwidth_kel <- gwr.sel(Reports_Count_Sc ~ Female_User_Sc + Male_User_Sc + Shannon_Time_Sc , data=Kelurahan, adapt=T, method = 'aic') 
 
 # Running the analysis
-gwr.model_kel = gwr(Reports_Count_Sc ~ Female_User_Sc + Male_User_Sc + Shannon_Time_Sc + Shannon_Age_Sc, data=Kelurahan, adapt=GWRbandwidth_kel, hatmatrix=TRUE, se.fit=TRUE) 
-?gwr
+gwr.model_kel = gwr(Reports_Count_Sc ~ Female_User_Sc + Male_User_Sc + Shannon_Time_Sc, data=Kelurahan, adapt=GWRbandwidth_kel, hatmatrix=TRUE, se.fit=TRUE) 
+gwr.model_kel1 = gwr(Reports_Count_Sc ~ Female_User_Sc + Male_User_Sc + Shannon_Time_Sc , data=Kelurahan, adapt=GWRbandwidth_kel, hatmatrix=TRUE, se.fit=TRUE) 
+
 # Printing the results
 gwr.model_kel
 
@@ -2494,13 +2574,39 @@ GWR_Residual_map
 ########################################################
 #### Multi-scale Geographically Weighted Regression ####
 ########################################################
+
+KelurahanSF
+
+coord=as.matrix(KelurahanSF[,c("coord.x","coord.y")])
+coord
+## Creating a spatial weigth matrix (sparce dgCMatrix) of 8 nearest neighbors
+W = KNN(coord,8)
+
+
+ptm1<-proc.time()
+model_GWR<-MGWRSAR(formula = 'Reports_Count_Sc ~ Female_User_Sc + Male_User_Sc + Shannon_Time_Sc + Shannon_Age_Sc', data = KelurahanSF, coord=coord,
+                   fixed_vars=NULL,kernels=c('gauss'), H= 0.13, Model = 'GWR',
+                   control=list(SE=TRUE,doMC=FALSE))
+(proc.time()-ptm1)[3]
+
+summary_mgwrsar(model_GWR)
+plot_mgwrsar(model_GWR,type='B_coef',var='X2')
+plot_mgwrsar(model_GWR,type='t_coef',var='X2')
+
 # --------
 # Analysis
 # --------
-mgwr.model_kel <- gwr.multiscale(Reports_Count_Sc ~ Female_User_Sc + Male_User_Sc + Shannon_Time_Sc + Shannon_Age_Sc, data=Kelurahan, kernel="gaussian", adapt=T, hatmatrix=TRUE, bws0 = GWRbandwidth_kel, approach="AIC", dMats)
+mgwr.model_kel <- gwr.multiscale(Reports_Count_Sc ~ Female_User_Sc + Male_User_Sc + Shannon_Time_Sc , data=Kelurahan, kernel="gaussian", adapt=T, hatmatrix=TRUE, bws0 = GWRbandwidth_kel, approach="AIC")
 print(mgwr.model_kel)
-mgwr.model_kel$SDF$residual
+mgwr.model_kel$lm$effects
+
 ?gwr.multiscale
+
+# ------------------------------------
+# If all predictors increase by 1 unit
+# ------------------------------------
+Kelurahan$MGWR_Simulation <- mgwr.model_kel$SDF$Intercept + mgwr.model_kel$SDF$Female_User_Sc + mgwr.model_kel$SDF$Male_User_Sc + mgwr.model_kel$SDF$Shannon_Time_Sc
+
 
 # --------------------
 # Plotting the results
@@ -2557,12 +2663,19 @@ MGWR_Residual_map <- tm_shape(Kelurahan) + tm_polygons("MGWR_Residuals",
                                                        midpoint=NA,
                                                        title="Residuals") + tm_layout(legend.text.size = 1.3, legend.title.size = 1.3)
 
+MGWR_Simulation_Map <- tm_shape(Kelurahan) + tm_polygons("MGWR_Simulation",
+                                                            style="jenks",
+                                                            palette=SigColours,
+                                                            midpoint=NA,
+                                                            title="Simulation") + tm_layout(legend.text.size = 1.3, legend.title.size = 1.3)
+
 
 
 MGWR_Est_Female_User_Map
 MGWR_Est_Male_User_Map
 MGWR_Est_Shannon_Age_Map
 MGWR_Est_Shannon_Time_Map
+MGWR_Simulation_Map
 MGWR_Residual_map
 
 # Looking for t-value of all variables 
@@ -2604,8 +2717,7 @@ MGWR_Sig_Shannon_Time_map <- tm_shape(Kelurahan) + tm_polygons("Sig_Shannon_Time
                                                                title="t-value Shannon Index of Report Times") + tm_layout(legend.text.size = 1.3, legend.title.size = 1.3)
 
 # Plotting the result
-MGWR_Sig_Female_User_map
+MGWR_Sig_Female_User_map 
 MGWR_Sig_Male_User_map 
 MGWR_Sig_Shannon_Time_map
 MGWR_Sig_Shannon_Age_map
-
